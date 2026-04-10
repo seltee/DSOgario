@@ -6,6 +6,7 @@ import 'package:frontend/core/blob_colors.dart';
 import 'package:frontend/models/config.dart';
 import 'package:frontend/models/game_world.dart';
 import 'package:frontend/models/network.dart';
+import 'package:frontend/models/theme_model.dart';
 import 'package:frontend/utils/provider.dart';
 import 'package:frontend/utils/web_socket.dart';
 
@@ -19,6 +20,7 @@ enum GameState { loading, auth, game }
 class GameModel extends ChangeNotifier {
   Network network = Network(baseUrl: baseUrl);
   GameWorld gameWorld = GameWorld();
+  ThemeModel themeModel = ThemeModel();
 
   RespServerInfo serverInfo = RespServerInfo();
 

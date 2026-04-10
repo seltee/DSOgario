@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/core/layout/night_mode.dart';
 import 'package:frontend/core/theme.dart';
 import 'package:frontend/models/game_controller.dart';
 import 'package:frontend/models/game_model.dart';
@@ -39,11 +40,27 @@ class _GameState extends State<GameApp> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: lightTheme,
-      darkTheme: darkTheme,
-      themeMode: ThemeMode.system,
-      home: GameModelProvider(model: gameModel, child: ScreenSwitcher()),
+    return GameModelProvider(
+      model: gameModel,
+      child: ListenableBuilder(
+        listenable: gameModel.themeModel,
+        builder: (context, _) {
+          return MaterialApp(
+            theme: lightTheme,
+            darkTheme: darkTheme,
+            themeMode: gameModel.themeModel.themeMode,
+            home: Stack(
+              children: [
+                Positioned.fill(child: ScreenSwitcher()),
+                Align(
+                  alignment: AlignmentGeometry.topRight,
+                  child: NightModeSwitcher(),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
