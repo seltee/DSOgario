@@ -9,6 +9,8 @@ The backend uses a single game loop and communicates with clients over WebSocket
 
 The game is fully playable with a working client-server architecture.
 
+---
+
 ## Why This Project
 
 This project focuses on real-time multiplayer architecture rather than gameplay itself.
@@ -19,6 +21,8 @@ Key areas:
 - Efficient binary communication over WebSockets
 - Handling multiple players without blocking the main loop
 - Minimizing bandwidth via compact data structures
+
+---
 
 ## Tech Stack
 
@@ -102,6 +106,8 @@ cd frontend
 flutter run -d linux
 ```
 
+---
+
 ## Project Status
 
 - Backend: implemented and stable
@@ -109,6 +115,8 @@ flutter run -d linux
 - Core gameplay: working (movement, eating, growth)
 - WebSocket communication: fully functional
 - Binary protocol: implemented and in use
+
+---
 
 ## Next Steps
 
