@@ -17,17 +17,20 @@ const playerViewDistance = 120.0
 const MessageTypeFrame = 1
 
 type Player struct {
-	Name       string
-	Token      string
-	ID         uint32
-	Conn       *websocket.Conn
-	sendChan   chan []byte
-	Position   Position
-	MoveTo     Position
-	ColorIndex uint8
-	Size       uint16
-	Radius     float64
-	Speed      float64
+	Name             string
+	Token            string
+	ID               uint32
+	Conn             *websocket.Conn
+	sendChan         chan []byte
+	Position         Position
+	MoveTo           Position
+	ColorIndex       uint8
+	Size             uint16
+	Radius           float64
+	Speed            float64
+	Eaten            bool
+	EatenTime        time.Time
+	MarkedForRemoval bool
 }
 
 type PlayerJoin struct {
@@ -96,7 +99,9 @@ func (player *Player) readPump(game *Game) {
 
 func (player *Player) writePump() {
 	defer func() {
-		player.Conn.Close()
+		if player.Conn != nil {
+			player.Conn.Close()
+		}
 	}()
 
 	for msg := range player.sendChan {
@@ -107,6 +112,8 @@ func (player *Player) writePump() {
 		err := player.Conn.WriteMessage(websocket.BinaryMessage, msg)
 		if err != nil {
 			fmt.Println("Write error:", err, "player: ", player.Name)
+			player.Conn.Close()
+			player.Conn = nil
 			return
 		}
 	}
@@ -142,21 +149,23 @@ func (game *Game) getVisibleEntitiesFor(player *Player) []*WSEntity {
 	viewDistSq := playerViewDistance * playerViewDistance
 
 	for _, listPlayer := range game.players {
-		diffX := listPlayer.Position.X - baseX
-		diffY := listPlayer.Position.Y - baseY
-		distSq := diffX*diffX + diffY*diffY
+		if !listPlayer.Eaten {
+			diffX := listPlayer.Position.X - baseX
+			diffY := listPlayer.Position.Y - baseY
+			distSq := diffX*diffX + diffY*diffY
 
-		if distSq < viewDistSq {
-			out = append(out, &WSEntity{
-				Type:       TypePlayer,
-				ColorIndex: listPlayer.ColorIndex,
-				Size:       listPlayer.Size,
-				ID:         listPlayer.ID,
-				RelPosX:    int16(diffX * Precision),
-				RelPosY:    int16(diffY * Precision),
-				RelMoveToX: int16((listPlayer.MoveTo.X - baseX) * Precision),
-				RelMoveToY: int16((listPlayer.MoveTo.Y - baseY) * Precision),
-			})
+			if distSq < viewDistSq {
+				out = append(out, &WSEntity{
+					Type:       TypePlayer,
+					ColorIndex: listPlayer.ColorIndex,
+					Size:       listPlayer.Size,
+					ID:         listPlayer.ID,
+					RelPosX:    int16(diffX * Precision),
+					RelPosY:    int16(diffY * Precision),
+					RelMoveToX: int16((listPlayer.MoveTo.X - baseX) * Precision),
+					RelMoveToY: int16((listPlayer.MoveTo.Y - baseY) * Precision),
+				})
+			}
 		}
 	}
 

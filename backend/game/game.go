@@ -57,17 +57,19 @@ func (game *Game) processPendingPlayers() {
 		case newPlayer := <-game.addPlayerChan:
 			position := genFieldPosition(game.fieldSize)
 			player := &Player{
-				Name:       newPlayer.Name,
-				Token:      newPlayer.Token,
-				Conn:       newPlayer.Conn,
-				ColorIndex: newPlayer.ColorIndex,
-				sendChan:   make(chan []byte, 1024),
-				Position:   position,
-				MoveTo:     position,
-				Size:       10,
-				Radius:     sizeToRadius(10),
-				Speed:      sizeToSpeed(10),
-				ID:         GetNextID(),
+				Name:             newPlayer.Name,
+				Token:            newPlayer.Token,
+				Conn:             newPlayer.Conn,
+				ColorIndex:       newPlayer.ColorIndex,
+				sendChan:         make(chan []byte, 1024),
+				Eaten:            false,
+				MarkedForRemoval: false,
+				Position:         position,
+				MoveTo:           position,
+				Size:             10,
+				Radius:           sizeToRadius(10),
+				Speed:            sizeToSpeed(10),
+				ID:               GetNextID(),
 			}
 			game.players[newPlayer.Token] = player
 
@@ -113,7 +115,13 @@ func (game *Game) processInputs() {
 }
 
 func (game *Game) updateWorld(delta float64) {
+	timeNow := time.Now()
+
 	for _, player := range game.players {
+		if player.Eaten {
+			continue
+		}
+
 		distToMoveX := player.MoveTo.X - player.Position.X
 		distToMoveY := player.MoveTo.Y - player.Position.Y
 		dist2 := distToMoveX*distToMoveX + distToMoveY*distToMoveY
@@ -127,6 +135,39 @@ func (game *Game) updateWorld(delta float64) {
 				player.Position.Y += (distToMoveY / dist) * player.Speed * delta
 			}
 		}
+
+		for _, playerCheck := range game.players {
+			if !playerCheck.Eaten && player.Size > uint16(float64(playerCheck.Size)*1.1) {
+				distToX := playerCheck.Position.X - player.Position.X
+				distToY := playerCheck.Position.Y - player.Position.Y
+				dist2 := distToX*distToX + distToY*distToY
+				if dist2 < player.Radius*player.Radius {
+					playerCheck.Eaten = true
+					playerCheck.EatenTime = timeNow
+					player.Size += playerCheck.Size
+				}
+			}
+		}
+	}
+
+	for key, player := range game.players {
+		if player.Eaten {
+			if player.Conn == nil {
+				player.MarkedForRemoval = true
+			}
+			if timeNow.Sub(player.EatenTime).Seconds() > 30 {
+				player.MarkedForRemoval = true
+			}
+		}
+
+		if player.MarkedForRemoval {
+			// remove player and close connection
+			if player.Conn != nil {
+				player.Conn.Close()
+				player.Conn = nil
+			}
+			delete(game.players, key)
+		}
 	}
 
 	i := 0
@@ -135,17 +176,19 @@ func (game *Game) updateWorld(delta float64) {
 		eaten := false
 
 		for _, player := range game.players {
-			diffX := crumb.Position.X - player.Position.X
-			diffY := crumb.Position.Y - player.Position.Y
-			distSq := diffX*diffX + diffY*diffY
-			eatDist := math.Max(player.Radius, crumb.Radius)
+			if !player.Eaten {
+				diffX := crumb.Position.X - player.Position.X
+				diffY := crumb.Position.Y - player.Position.Y
+				distSq := diffX*diffX + diffY*diffY
+				eatDist := math.Max(player.Radius, crumb.Radius)
 
-			if distSq < eatDist*eatDist {
-				// Crumb eaten!
-				player.Size += uint16(crumb.Size)
-				player.Radius = sizeToRadius(player.Size)
-				eaten = true
-				break
+				if distSq < eatDist*eatDist {
+					// Crumb eaten!
+					player.Size += uint16(crumb.Size)
+					player.Radius = sizeToRadius(player.Size)
+					eaten = true
+					break
+				}
 			}
 		}
 
