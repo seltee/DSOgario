@@ -94,13 +94,15 @@ func (game *Game) processNewCrumbs(delta float64) {
 	game.crumbsTimer -= delta * float64(crumbsPerSecond)
 	if game.crumbsTimer < 0.0 {
 		game.crumbsTimer += 1.0
-		size := uint16(rand.IntN(2) + 1)
-		game.crumbs = append(game.crumbs, &Crumb{
-			Position: genFieldPosition(game.fieldSize),
-			Size:     size,
-			Radius:   sizeToRadius(size),
-			ID:       GetNextID(),
-		})
+		if len(game.crumbs) < 800 {
+			size := uint16(rand.IntN(2) + 1)
+			game.crumbs = append(game.crumbs, &Crumb{
+				Position: genFieldPosition(game.fieldSize),
+				Size:     size,
+				Radius:   sizeToRadius(size),
+				ID:       GetNextID(),
+			})
+		}
 	}
 }
 

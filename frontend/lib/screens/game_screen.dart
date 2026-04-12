@@ -113,7 +113,7 @@ class GamePainter extends CustomPainter {
 
       final screenPos = center.translate(
         entity.relPos.dx * zoom - textWidth / 2,
-        entity.relPos.dy * zoom - (radius * 1.5 + 2) * zoom,
+        entity.relPos.dy * zoom - (radius * 1.5 + 1.5) * zoom,
       );
 
       textPainter.paint(canvas, screenPos);
