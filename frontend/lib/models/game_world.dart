@@ -4,10 +4,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:frontend/core/blob_colors.dart';
 import 'package:frontend/models/config.dart';
+import 'package:frontend/models/game_score.dart';
 import 'package:frontend/models/game_world_entity.dart';
 
 class GameWorld extends ChangeNotifier {
   Map<String, GameWorldEntity> entities = <String, GameWorldEntity>{};
+  GameScore gameScore = GameScore();
+
   Size? screenSize;
 
   double zoom = 12.0;
@@ -67,6 +70,11 @@ class GameWorld extends ChangeNotifier {
 
     entities.removeWhere((id, entity) => !entity.updatedThisFrame);
 
+    notifyListeners();
+  }
+
+  void provideScore(ByteData data) {
+    gameScore.parseBinary(data);
     notifyListeners();
   }
 

@@ -15,6 +15,7 @@ const TypePlayer = 1
 const playerViewDistance = 120.0
 
 const MessageTypeFrame = 1
+const MessageTypeScores = 2
 
 type Player struct {
 	Name             string
@@ -43,6 +44,13 @@ type PlayerJoin struct {
 type PlayerInput struct {
 	Token     string
 	RelMoveTo Position
+}
+
+type PlayerScoreItem struct {
+	ID         uint32
+	ColorIndex uint8
+	Name       string
+	Size       uint16
 }
 
 type WSEntity struct {
@@ -137,6 +145,48 @@ func (game *Game) buildFrameFor(player *Player) []byte {
 		binary.BigEndian.PutUint16(frame[offset+8:offset+10], uint16(entity.RelPosX))
 		binary.BigEndian.PutUint16(frame[offset+10:offset+12], uint16(entity.RelPosY))
 		offset += entitySize
+	}
+
+	return frame
+}
+
+func (game *Game) buildScore() []byte {
+	list := make([]*PlayerScoreItem, 0, 128)
+	for _, listPlayer := range game.players {
+		if !listPlayer.Eaten {
+			list = append(list, &PlayerScoreItem{
+				ID:         listPlayer.ID,
+				ColorIndex: listPlayer.ColorIndex,
+				Name:       listPlayer.Name,
+				Size:       listPlayer.Size,
+			})
+		}
+	}
+	count := len(list)
+
+	byteSize := 4 // 0 - 2 message type, 2 - 4 entity count
+	for _, info := range list {
+		byteSize += 8 // ID - 4, Size - 2, Color - 1, NameLength - 1
+		byteSize += len(info.Name)
+	}
+
+	frame := make([]byte, byteSize)
+	binary.BigEndian.PutUint16(frame[0:2], MessageTypeScores) // message type
+	binary.BigEndian.PutUint16(frame[2:4], uint16(count))     // entity count
+
+	offset := 4
+	for _, entity := range list {
+		binary.BigEndian.PutUint32(frame[offset+0:offset+4], entity.ID)
+		binary.BigEndian.PutUint16(frame[offset+4:offset+6], entity.Size)
+		frame[offset+6] = entity.ColorIndex
+		frame[offset+7] = uint8(len(entity.Name))
+
+		// Write the name bytes starting at offset+8
+		nameBytes := []byte(entity.Name)
+		copy(frame[offset+8:offset+8+len(nameBytes)], nameBytes)
+
+		// Advance the offset for the next entity
+		offset += 8 + len(nameBytes)
 	}
 
 	return frame

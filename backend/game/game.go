@@ -8,12 +8,13 @@ import (
 )
 
 type Game struct {
-	players       map[string]*Player
-	addPlayerChan chan *PlayerJoin
-	inputChan     chan *PlayerInput
-	crumbs        []*Crumb
-	crumbsTimer   float64
-	fieldSize     float64
+	players              map[string]*Player
+	addPlayerChan        chan *PlayerJoin
+	inputChan            chan *PlayerInput
+	crumbs               []*Crumb
+	crumbsTimer          float64
+	fieldSize            float64
+	broadcastScoreTicker int
 }
 
 func New() *Game {
@@ -46,6 +47,12 @@ func (game *Game) Run() {
 		game.updateWorld(delta)
 
 		game.broadcastFrame()
+
+		game.broadcastScoreTicker++
+		if game.broadcastScoreTicker > 200 {
+			game.broadcastScoreTicker = 0
+			game.broadcastScore()
+		}
 
 		<-ticker.C
 	}
@@ -212,6 +219,18 @@ func (game *Game) broadcastFrame() {
 
 		select {
 		case player.sendChan <- frame:
+			// data frame sent
+		default:
+			// data frame dropped
+		}
+	}
+}
+
+func (game *Game) broadcastScore() {
+	score := game.buildScore()
+	for _, player := range game.players {
+		select {
+		case player.sendChan <- score:
 			// data frame sent
 		default:
 			// data frame dropped

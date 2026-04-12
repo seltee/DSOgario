@@ -103,6 +103,9 @@ class GameModel extends ChangeNotifier {
           case 1:
             gameWorld.provideFrame(byteData);
             break;
+          case 2:
+            gameWorld.provideScore(byteData);
+            break;
           default:
             print('Unknown message type $messageType');
         }

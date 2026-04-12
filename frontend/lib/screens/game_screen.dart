@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/core/blob_colors.dart';
+import 'package:frontend/core/layout/score.dart';
 import 'package:frontend/models/game_model.dart';
 import 'package:frontend/models/game_world.dart';
 import 'package:frontend/models/game_world_entity.dart';
@@ -14,26 +15,35 @@ class GameScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: gameWorld,
       builder: (context, widget) {
-        return Container(
-          decoration: BoxDecoration(color: Theme.of(context).canvasColor),
-          child: GestureDetector(
-            // Tap / Move / Release callbacks
-            onPanStart: (DragStartDetails details) {
-              final Offset localPos = details.localPosition;
-              gameWorld.startDirectingPlayer(localPos);
-            },
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(color: Theme.of(context).canvasColor),
+                child: GestureDetector(
+                  // Tap / Move / Release callbacks
+                  onPanStart: (DragStartDetails details) {
+                    final Offset localPos = details.localPosition;
+                    gameWorld.startDirectingPlayer(localPos);
+                  },
 
-            onPanUpdate: (DragUpdateDetails details) {
-              final Offset localPos = details.localPosition;
-              gameWorld.updatePlayerDirection(localPos);
-            },
+                  onPanUpdate: (DragUpdateDetails details) {
+                    final Offset localPos = details.localPosition;
+                    gameWorld.updatePlayerDirection(localPos);
+                  },
 
-            onPanEnd: (DragEndDetails details) {
-              gameWorld.stopDirectingPlayer();
-            },
+                  onPanEnd: (DragEndDetails details) {
+                    gameWorld.stopDirectingPlayer();
+                  },
 
-            child: CustomPaint(painter: GamePainter(gameWorld: gameWorld)),
-          ),
+                  child: CustomPaint(
+                    painter: GamePainter(gameWorld: gameWorld),
+                  ),
+                ),
+              ),
+            ),
+            Score(),
+          ],
         );
       },
     );
