@@ -131,6 +131,16 @@ func (game *Game) updateWorld(delta float64) {
 			continue
 		}
 
+		player.SizeTimer += delta
+		reduceCount := 0.5 + 200.0/float64(player.Size)
+		if player.SizeTimer > reduceCount {
+			player.SizeTimer = 0
+			if player.Size > 10 {
+				player.Size--
+				player.Radius = sizeToRadius(player.Size)
+			}
+		}
+
 		distToMoveX := player.MoveTo.X - player.Position.X
 		distToMoveY := player.MoveTo.Y - player.Position.Y
 		dist2 := distToMoveX*distToMoveX + distToMoveY*distToMoveY

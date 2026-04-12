@@ -27,6 +27,7 @@ type Player struct {
 	MoveTo           Position
 	ColorIndex       uint8
 	Size             uint16
+	SizeTimer        float64
 	Radius           float64
 	Speed            float64
 	Eaten            bool
