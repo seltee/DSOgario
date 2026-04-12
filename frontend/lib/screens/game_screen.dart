@@ -54,6 +54,10 @@ class GamePainter extends CustomPainter {
   final GameWorld gameWorld;
   GamePainter({required this.gameWorld});
 
+  double getVisibleRadius(double size) {
+    return (size + 10) * 0.02;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     gameWorld.updateScreenSize(size);
@@ -64,7 +68,7 @@ class GamePainter extends CustomPainter {
 
     // Draw all entities at screen center
     for (var entity in gameWorld.entities.values) {
-      double radius = (entity.size.toDouble() + 10) * 0.02 * zoom;
+      double radius = getVisibleRadius(entity.size.toDouble());
 
       final screenPos = center.translate(
         entity.relPos.dx * zoom,
@@ -73,12 +77,46 @@ class GamePainter extends CustomPainter {
 
       canvas.drawCircle(
         screenPos,
-        radius,
+        radius * zoom,
         Paint()
           ..color = entity.type == GameEntityType.player
               ? Color(blobColors[entity.colorIndex])
               : crumbColor, // use your entity.color
       );
+    }
+
+    // Draw entity names
+    for (var entity in gameWorld.entities.values) {
+      var item = gameWorld.gameScore.getScoreItemById(entity.id);
+      if (item == null) continue;
+
+      double radius = getVisibleRadius(entity.size.toDouble());
+
+      final textStyle = TextStyle(
+        color: Color(blobColors[item.colorIndex]),
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        shadows: const [
+          Shadow(blurRadius: 3, color: Colors.white, offset: Offset(0, 0)),
+        ],
+      );
+
+      final textPainter = TextPainter(
+        text: TextSpan(text: item.name, style: textStyle),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+
+      textPainter.layout();
+
+      final double textWidth = textPainter.width;
+
+      final screenPos = center.translate(
+        entity.relPos.dx * zoom - textWidth / 2,
+        entity.relPos.dy * zoom - (radius * 1.5 + 2) * zoom,
+      );
+
+      textPainter.paint(canvas, screenPos);
     }
   }
 

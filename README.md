@@ -108,6 +108,12 @@ flutter run -d linux
 
 ---
 
+## License
+
+MIT License – feel free to explore and learn from the code.
+
+---
+
 ## Project Status
 
 - Backend: implemented and stable
@@ -115,15 +121,15 @@ flutter run -d linux
 - Core gameplay: working (movement, eating, growth)
 - WebSocket communication: fully functional
 - Binary protocol: implemented and in use
+- UI/UX improvements (player names, score display, HUD)
+- Game is playable end-to-end.
 
 ---
 
 ## Next Steps
 
-- UI/UX improvements (player names, score display, HUD)
-- Add sound effects and background music
 - Complete day/night mode
 - General polish and quality-of-life improvements
 - Additional gameplay features (splitting, merging, etc.)
 - Performance tuning and optimization
-- Game is playable end-to-end.
+- Add sound effects and background music

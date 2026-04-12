@@ -70,6 +70,15 @@ class GameScore extends ChangeNotifier {
     scoreList.sort((a, b) => b.size.compareTo(a.size));
     notifyListeners();
   }
+
+  GameScoreListItem? getScoreItemById(int playerID) {
+    final index = scoreList.indexWhere((listItem) => listItem.id == playerID);
+    if (index != -1) {
+      return scoreList[index];
+    } else {
+      return null;
+    }
+  }
 }
 
 class GameScoreListItem {
