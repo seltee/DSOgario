@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/core/blob_colors.dart';
+import 'package:frontend/core/layout/game_over.dart';
 import 'package:frontend/core/layout/score.dart';
 import 'package:frontend/models/game_model.dart';
 import 'package:frontend/models/game_world.dart';
@@ -43,6 +44,7 @@ class GameScreen extends StatelessWidget {
               ),
             ),
             Score(),
+            Center(child: NewGame()),
           ],
         );
       },

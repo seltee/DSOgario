@@ -28,7 +28,9 @@ class AuthScreen extends StatelessWidget {
               ),
               Padding(padding: EdgeInsetsGeometry.symmetric(vertical: 4)),
               ElevatedButton(
-                onPressed: () => gameModel.suggestNewName(),
+                onPressed: gameModel.isLoggingIn
+                    ? null
+                    : () => gameModel.suggestNewName(),
                 child: const Text('Change name'),
               ),
               Padding(padding: EdgeInsetsGeometry.symmetric(vertical: 8)),

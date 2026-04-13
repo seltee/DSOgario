@@ -16,6 +16,7 @@ class GameWorld extends ChangeNotifier {
   double zoom = 12.0;
   double targetZoom = 12.0;
   bool directingPlayer = false;
+  bool playerIsEaten = false;
   Offset playerDirection = Offset(0, 0);
 
   Timer? _inputTimer;
@@ -30,9 +31,10 @@ class GameWorld extends ChangeNotifier {
     }
 
     int playerId = data.getUint32(4);
+    playerIsEaten = data.getUint8(8) != 0;
 
     for (int el = 0; el < entityCount; el++) {
-      int offset = 8 + el * 16;
+      int offset = 12 + el * 16;
       final entityType = data.getUint8(offset + 0);
       final entityColorIndex = data.getUint8(offset + 1);
       final entitySize = data.getUint16(offset + 2, Endian.big);

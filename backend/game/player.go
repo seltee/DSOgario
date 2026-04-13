@@ -72,7 +72,10 @@ func (game *Game) AddPlayer(p *PlayerJoin) {
 // method on Player
 func (player *Player) readPump(game *Game) {
 	defer func() {
-		player.Conn.Close()
+		if player.Conn != nil {
+			player.Conn.Close()
+			player.Conn = nil
+		}
 	}()
 
 	token := player.Token
@@ -114,30 +117,35 @@ func (player *Player) writePump() {
 	}()
 
 	for msg := range player.sendChan {
-		// Note: We no longer get the 'ok' value directly here
+		if player.Conn != nil {
+			player.Conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
 
-		player.Conn.SetWriteDeadline(time.Now().Add(100 * time.Millisecond))
-
-		err := player.Conn.WriteMessage(websocket.BinaryMessage, msg)
-		if err != nil {
-			fmt.Println("Write error:", err, "player: ", player.Name)
-			player.Conn.Close()
-			player.Conn = nil
-			return
+			err := player.Conn.WriteMessage(websocket.BinaryMessage, msg)
+			if err != nil {
+				fmt.Println("Write error:", err, "player: ", player.Name)
+				player.Conn.Close()
+				player.Conn = nil
+				return
+			}
 		}
 	}
 }
 
 func (game *Game) buildFrameFor(player *Player) []byte {
-	visible := game.getVisibleEntitiesFor(player) // your own function, returns []*Entity or similar
+	visible := game.getVisibleEntitiesFor(player)
 	count := len(visible)
 
-	frame := make([]byte, 8+count*entitySize)
+	frame := make([]byte, 12+count*entitySize)
 	binary.BigEndian.PutUint16(frame[0:2], MessageTypeFrame) // message type
 	binary.BigEndian.PutUint16(frame[2:4], uint16(count))    // entity count
 	binary.BigEndian.PutUint32(frame[4:8], player.ID)
+	if player.Eaten { // is eaten
+		frame[8] = 1
+	} else {
+		frame[8] = 0
+	}
 
-	offset := 8
+	offset := 12
 	for _, entity := range visible {
 		frame[offset+0] = entity.Type
 		frame[offset+1] = entity.ColorIndex

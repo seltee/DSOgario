@@ -126,6 +126,24 @@ class GameModel extends ChangeNotifier {
     }
   }
 
+  void restart() {
+    disconnect();
+    enterTheGame();
+    notifyListeners();
+  }
+
+  void goToMainMenu() {
+    disconnect();
+    isLoggingIn = false;
+    isInGame = false;
+    notifyListeners();
+  }
+
+  void disconnect() {
+    _webSocket?.disconnect();
+    _webSocket = null;
+  }
+
   void update(double delta) {
     gameWorld.update(delta);
   }
