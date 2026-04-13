@@ -116,9 +116,18 @@ class GameModel extends ChangeNotifier {
       _webSocket?.onError = (String error) {
         isLoggingIn = false;
         isInGame = false;
+        gameReady = false;
+        initGame();
         notifyListeners();
         print("ERROR");
         print(error);
+      };
+      _webSocket?.onDisconnected = (String error) {
+        isLoggingIn = false;
+        isInGame = false;
+        gameReady = false;
+        initGame();
+        notifyListeners();
       };
 
       _webSocket?.connect();
