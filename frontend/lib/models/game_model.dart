@@ -27,6 +27,7 @@ class GameModel extends ChangeNotifier {
   bool gameReady = false;
   bool isLoggingIn = false;
   bool isInGame = false;
+  bool serverIsUnavailable = false;
   String name = "";
   String token = "";
 
@@ -45,6 +46,8 @@ class GameModel extends ChangeNotifier {
       serverInfo = status;
       suggestNewName();
       gameReady = true;
+    } else {
+      serverIsUnavailable = true;
     }
     notifyListeners();
   }
