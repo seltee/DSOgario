@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const entitySize = 16
+const entitySize = 20
 const MaxPlayers = 256
 
 const TypePlayer = 1
@@ -17,23 +17,35 @@ const playerViewDistance = 120.0
 const MessageTypeFrame = 1
 const MessageTypeScores = 2
 
+const MessageInputTypeMove = 1
+const MessageInputTypeDivide = 2
+
 type Player struct {
 	Name             string
 	Token            string
 	ID               uint32
 	Conn             *websocket.Conn
 	sendChan         chan []byte
-	Position         Position
+	Chunks           []*PlayerChunk
 	MoveTo           Position
+	PlayerCenter     Position
 	ColorIndex       uint8
-	Size             uint16
-	SizeTimer        float64
-	Radius           float64
 	Speed            float64
 	Eaten            bool
 	EatenTime        time.Time
 	DisconnectedTime time.Time
 	MarkedForRemoval bool
+	Size             uint16
+	MergeBlock       float64
+}
+
+type PlayerChunk struct {
+	Position  Position
+	ShiftTo   Position
+	Size      uint16
+	SizeTimer float64
+	Radius    float64
+	ID        uint32
 }
 
 type PlayerJoin struct {
@@ -45,7 +57,8 @@ type PlayerJoin struct {
 
 type PlayerInput struct {
 	Token     string
-	RelMoveTo Position
+	RelTarget Position
+	Divide    bool
 }
 
 type PlayerScoreItem struct {
@@ -60,6 +73,7 @@ type WSEntity struct {
 	ColorIndex uint8
 	Size       uint16
 	ID         uint32
+	OwnerID    uint32
 	RelPosX    int16
 	RelPosY    int16
 	RelMoveToX int16
@@ -90,22 +104,42 @@ func (player *Player) readPump(game *Game) {
 		}
 
 		if len(message) == 6 {
-			// 0-2 type
-			relX := int16(binary.BigEndian.Uint16(message[2:4]))
-			relY := int16(binary.BigEndian.Uint16(message[4:6]))
+			// 0-2 message type
+			messageType := int16(binary.BigEndian.Uint16(message[0:2]))
 
-			input := PlayerInput{
-				Token: token,
-				RelMoveTo: Position{
-					X: float64(relX) / Precision,
-					Y: float64(relY) / Precision,
-				},
+			relX := float64(int16(binary.BigEndian.Uint16(message[2:4]))) / Precision
+			relY := float64(int16(binary.BigEndian.Uint16(message[4:6]))) / Precision
+
+			if messageType == MessageInputTypeMove {
+				input := PlayerInput{
+					Token: token,
+					RelTarget: Position{
+						X: relX,
+						Y: relY,
+					},
+					Divide: false,
+				}
+
+				select {
+				case game.inputChan <- &input:
+				default: // input queue full, dropping the input
+				}
 			}
 
-			select {
-			case game.inputChan <- &input:
-			default:
-				// input queue full, dropping the input
+			if messageType == MessageInputTypeDivide {
+				input := PlayerInput{
+					Token: token,
+					RelTarget: Position{
+						X: relX,
+						Y: relY,
+					},
+					Divide: true,
+				}
+
+				select {
+				case game.inputChan <- &input:
+				default: // input queue full, dropping the input
+				}
 			}
 		}
 	}
@@ -154,8 +188,9 @@ func (game *Game) buildFrameFor(player *Player) []byte {
 		frame[offset+1] = entity.ColorIndex
 		binary.BigEndian.PutUint16(frame[offset+2:offset+4], entity.Size)
 		binary.BigEndian.PutUint32(frame[offset+4:offset+8], entity.ID)
-		binary.BigEndian.PutUint16(frame[offset+8:offset+10], uint16(entity.RelPosX))
-		binary.BigEndian.PutUint16(frame[offset+10:offset+12], uint16(entity.RelPosY))
+		binary.BigEndian.PutUint32(frame[offset+8:offset+12], entity.OwnerID)
+		binary.BigEndian.PutUint16(frame[offset+12:offset+14], uint16(entity.RelPosX))
+		binary.BigEndian.PutUint16(frame[offset+14:offset+16], uint16(entity.RelPosY))
 		offset += entitySize
 	}
 
@@ -206,27 +241,31 @@ func (game *Game) buildScore() []byte {
 
 func (game *Game) getVisibleEntitiesFor(player *Player) []*WSEntity {
 	out := make([]*WSEntity, 0, 128)
-	baseX := player.Position.X
-	baseY := player.Position.Y
+	baseX := player.PlayerCenter.X
+	baseY := player.PlayerCenter.Y
+
 	viewDistSq := playerViewDistance * playerViewDistance
 
 	for _, listPlayer := range game.players {
 		if !listPlayer.Eaten {
-			diffX := listPlayer.Position.X - baseX
-			diffY := listPlayer.Position.Y - baseY
-			distSq := diffX*diffX + diffY*diffY
+			for _, chunk := range listPlayer.Chunks {
+				diffX := chunk.Position.X - baseX
+				diffY := chunk.Position.Y - baseY
+				distSq := diffX*diffX + diffY*diffY
 
-			if distSq < viewDistSq {
-				out = append(out, &WSEntity{
-					Type:       TypePlayer,
-					ColorIndex: listPlayer.ColorIndex,
-					Size:       listPlayer.Size,
-					ID:         listPlayer.ID,
-					RelPosX:    int16(diffX * Precision),
-					RelPosY:    int16(diffY * Precision),
-					RelMoveToX: int16((listPlayer.MoveTo.X - baseX) * Precision),
-					RelMoveToY: int16((listPlayer.MoveTo.Y - baseY) * Precision),
-				})
+				if distSq < viewDistSq {
+					out = append(out, &WSEntity{
+						Type:       TypePlayer,
+						ColorIndex: listPlayer.ColorIndex,
+						Size:       chunk.Size,
+						ID:         chunk.ID,
+						OwnerID:    listPlayer.ID,
+						RelPosX:    int16(diffX * Precision),
+						RelPosY:    int16(diffY * Precision),
+						RelMoveToX: int16((listPlayer.MoveTo.X - baseX) * Precision),
+						RelMoveToY: int16((listPlayer.MoveTo.Y - baseY) * Precision),
+					})
+				}
 			}
 		}
 	}
@@ -242,6 +281,7 @@ func (game *Game) getVisibleEntitiesFor(player *Player) []*WSEntity {
 				ColorIndex: 0,
 				Size:       listCrumb.Size,
 				ID:         listCrumb.ID,
+				OwnerID:    listCrumb.ID,
 				RelPosX:    int16((listCrumb.Position.X - baseX) * Precision),
 				RelPosY:    int16((listCrumb.Position.Y - baseY) * Precision),
 				RelMoveToX: 0,

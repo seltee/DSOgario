@@ -4,6 +4,7 @@ enum GameEntityType { unknown, player, crumb }
 
 class GameWorldEntity {
   final int id;
+  final int ownerId;
   final GameEntityType type;
   final int colorIndex;
 
@@ -15,6 +16,7 @@ class GameWorldEntity {
 
   GameWorldEntity({
     required this.id,
+    required this.ownerId,
     required this.type,
     required this.colorIndex,
     required this.size,

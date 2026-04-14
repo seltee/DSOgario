@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:frontend/core/layout/night_mode.dart';
 import 'package:frontend/core/theme.dart';
 import 'package:frontend/models/game_controller.dart';
@@ -21,20 +22,34 @@ class GameApp extends StatefulWidget {
 class _GameState extends State<GameApp> with SingleTickerProviderStateMixin {
   late GameController controller;
   late GameModel gameModel;
+  late final KeyEventCallback _keyHandler;
 
   @override
   void initState() {
     super.initState();
-
     gameModel = GameModel();
     controller = GameController(gameModel, this);
     controller.start();
     gameModel.initGame();
+
+    _keyHandler = (KeyEvent event) {
+      if (event is KeyDownEvent) {
+        // Key was pressed
+        if (event.logicalKey == LogicalKeyboardKey.space) {
+          gameModel.sendPlayerDivide(gameModel.playerDirectionMem);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    HardwareKeyboard.instance.addHandler(_keyHandler);
   }
 
   @override
   void dispose() {
     controller.dispose();
+    HardwareKeyboard.instance.removeHandler(_keyHandler);
     super.dispose();
   }
 

@@ -11,7 +11,8 @@ class GameScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gameWorld = GameModelProvider.of(context).gameWorld;
+    final gameModel = GameModelProvider.of(context);
+    final gameWorld = gameModel.gameWorld;
 
     return ListenableBuilder(
       listenable: gameWorld,
@@ -25,6 +26,8 @@ class GameScreen extends StatelessWidget {
                   // Tap / Move / Release callbacks
                   onPanStart: (DragStartDetails details) {
                     final Offset localPos = details.localPosition;
+                    gameModel.playerDirectionMem = gameWorld
+                        .convertScreenToWorld(localPos);
                     gameWorld.startDirectingPlayer(localPos);
                   },
 
@@ -89,7 +92,7 @@ class GamePainter extends CustomPainter {
 
     // Draw entity names
     for (var entity in gameWorld.entities.values) {
-      var item = gameWorld.gameScore.getScoreItemById(entity.id);
+      var item = gameWorld.gameScore.getScoreItemById(entity.ownerId);
       if (item == null) continue;
 
       double radius = getVisibleRadius(entity.size.toDouble());

@@ -15,6 +15,9 @@ final random = Random();
 const baseUrl = 'http://localhost:8080';
 const baseWSUrl = 'ws://localhost:8080';
 
+const inputMessageMoveTo = 1;
+const inputMessageDivide = 2;
+
 enum GameState { loading, auth, game }
 
 class GameModel extends ChangeNotifier {
@@ -33,11 +36,15 @@ class GameModel extends ChangeNotifier {
 
   int colorIndex = 0;
 
+  Offset playerDirectionMem = Offset(0, 0);
+
   WebSocket? _webSocket;
 
   GameModel() {
     gameWorld.sendPlayerDirection = (Offset playerDirection) =>
         sendPlayerDirection(playerDirection);
+    gameWorld.sendPlayerDivide = (Offset playerDirection) =>
+        sendPlayerDivide(playerDirection);
   }
 
   void initGame() async {
@@ -161,20 +168,43 @@ class GameModel extends ChangeNotifier {
   }
 
   void sendPlayerDirection(Offset playerDirection) {
-    final int directionX = (playerDirection.dx * precision)
-        .clamp(-32768, 32767)
-        .toInt();
-    final int directionY = (playerDirection.dy * precision)
-        .clamp(-32768, 32767)
-        .toInt();
+    playerDirectionMem = playerDirection;
+    if (isInGame) {
+      final int directionX = (playerDirection.dx * precision)
+          .clamp(-32768, 32767)
+          .toInt();
+      final int directionY = (playerDirection.dy * precision)
+          .clamp(-32768, 32767)
+          .toInt();
 
-    final inputBytes = Uint8List(6);
-    final ByteData bd = inputBytes.buffer.asByteData();
-    bd.setUint16(0, 0, Endian.big); // message type, position
-    bd.setInt16(2, directionX, Endian.big); // direction x
-    bd.setInt16(4, directionY, Endian.big); // direction y
+      final inputBytes = Uint8List(6);
+      final ByteData bd = inputBytes.buffer.asByteData();
+      bd.setUint16(0, inputMessageMoveTo, Endian.big); // message type, position
+      bd.setInt16(2, directionX, Endian.big); // direction x
+      bd.setInt16(4, directionY, Endian.big); // direction y
 
-    _webSocket?.sendInput(inputBytes);
+      _webSocket?.sendInput(inputBytes);
+    }
+  }
+
+  void sendPlayerDivide(Offset playerDirection) {
+    playerDirectionMem = playerDirection;
+    if (isInGame) {
+      final int directionX = (playerDirection.dx * precision)
+          .clamp(-32768, 32767)
+          .toInt();
+      final int directionY = (playerDirection.dy * precision)
+          .clamp(-32768, 32767)
+          .toInt();
+
+      final inputBytes = Uint8List(6);
+      final ByteData bd = inputBytes.buffer.asByteData();
+      bd.setUint16(0, inputMessageDivide, Endian.big); // message type, position
+      bd.setInt16(2, directionX, Endian.big); // direction x
+      bd.setInt16(4, directionY, Endian.big); // direction y
+
+      _webSocket?.sendInput(inputBytes);
+    }
   }
 }
 

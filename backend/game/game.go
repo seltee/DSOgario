@@ -71,13 +71,22 @@ func (game *Game) processPendingPlayers() {
 				sendChan:         make(chan []byte, 1024),
 				Eaten:            false,
 				MarkedForRemoval: false,
-				Position:         position,
+				Chunks:           make([]*PlayerChunk, 0, 8),
 				MoveTo:           position,
-				Size:             10,
-				Radius:           sizeToRadius(10),
 				Speed:            sizeToSpeed(10),
+				Size:             10,
+				PlayerCenter:     position,
 				ID:               GetNextID(),
 			}
+			player.Chunks = append(player.Chunks, &PlayerChunk{
+				Position:  position,
+				ShiftTo:   Position{X: 0, Y: 0},
+				Radius:    sizeToRadius(10),
+				Size:      10,
+				SizeTimer: 0,
+				ID:        GetNextID(),
+			})
+
 			game.players[newPlayer.Token] = player
 
 			go player.readPump(game)
@@ -111,9 +120,48 @@ func (game *Game) processInputs() {
 		select {
 		case input := <-game.inputChan:
 			if player, ok := game.players[input.Token]; ok {
-				player.MoveTo = Position{
-					X: player.Position.X + input.RelMoveTo.X,
-					Y: player.Position.Y + input.RelMoveTo.Y,
+				if input.Divide {
+					forDivision := len(player.Chunks)
+					for i := 0; i < forDivision; i++ {
+						chunk := player.Chunks[i]
+						size := chunk.Size
+						if size >= 20 {
+							chunk.Size = size / 2
+							chunk.Radius = sizeToRadius(chunk.Size)
+							newChunkSize := size - chunk.Size
+
+							distToMoveX := player.MoveTo.X - chunk.Position.X
+							distToMoveY := player.MoveTo.Y - chunk.Position.Y
+							dist2 := distToMoveX*distToMoveX + distToMoveY*distToMoveY
+							if dist2 > 0.001 {
+								dist := math.Sqrt(dist2)
+								shiftX := (distToMoveX / dist)
+								shiftY := (distToMoveY / dist)
+
+								player.Chunks = append(player.Chunks, &PlayerChunk{
+									Position: Position{
+										X: chunk.Position.X,
+										Y: chunk.Position.Y,
+									},
+									ShiftTo: Position{
+										X: shiftX,
+										Y: shiftY,
+									},
+									Size:   newChunkSize,
+									Radius: sizeToRadius(newChunkSize),
+									ID:     GetNextID(),
+								})
+							}
+						}
+					}
+					player.MergeBlock = 1.0
+				} else {
+					for _, chunk := range player.Chunks {
+						player.MoveTo = Position{
+							X: chunk.Position.X + input.RelTarget.X,
+							Y: chunk.Position.Y + input.RelTarget.Y,
+						}
+					}
 				}
 			}
 
@@ -131,41 +179,121 @@ func (game *Game) updateWorld(delta float64) {
 			continue
 		}
 
-		player.SizeTimer += delta
-		reduceCount := 0.5 + 200.0/float64(player.Size)
-		if player.SizeTimer > reduceCount {
-			player.SizeTimer = 0
-			if player.Size > 10 {
-				player.Size--
-				player.Radius = sizeToRadius(player.Size)
-			}
-		}
+		if player.MergeBlock > 0 {
+			player.MergeBlock -= delta
+		} else {
+			for i := 0; i < len(player.Chunks); i++ {
+				chunk := player.Chunks[i]
+				for check := i + 1; check < len(player.Chunks); check++ {
+					chunkCheck := player.Chunks[check]
 
-		distToMoveX := player.MoveTo.X - player.Position.X
-		distToMoveY := player.MoveTo.Y - player.Position.Y
-		dist2 := distToMoveX*distToMoveX + distToMoveY*distToMoveY
-		if dist2 > 0.001 {
-			dist := math.Sqrt(dist2)
-			if dist < player.Speed*delta {
-				player.Position.X = player.MoveTo.X
-				player.Position.Y = player.MoveTo.Y
-			} else {
-				player.Position.X += (distToMoveX / dist) * player.Speed * delta
-				player.Position.Y += (distToMoveY / dist) * player.Speed * delta
-			}
-		}
-
-		for _, playerCheck := range game.players {
-			if !playerCheck.Eaten && player.Size > uint16(float64(playerCheck.Size)*1.1) {
-				distToX := playerCheck.Position.X - player.Position.X
-				distToY := playerCheck.Position.Y - player.Position.Y
-				dist2 := distToX*distToX + distToY*distToY
-				if dist2 < player.Radius*player.Radius {
-					playerCheck.Eaten = true
-					playerCheck.EatenTime = timeNow
-					player.Size += playerCheck.Size
+					diffX := chunk.Position.X - chunkCheck.Position.X
+					diffY := chunk.Position.Y - chunkCheck.Position.Y
+					dist2 := diffX*diffX + diffY*diffY
+					maxRadius := math.Max(chunk.Radius, chunkCheck.Radius)
+					if dist2 < maxRadius*maxRadius {
+						chunk.Size += chunkCheck.Size
+						chunk.Radius = sizeToRadius(chunk.Size)
+						last := len(player.Chunks) - 1
+						player.Chunks[check] = player.Chunks[last]
+						player.Chunks = player.Chunks[:last]
+						break
+					}
 				}
 			}
+		}
+
+		// merge with itself
+		player.Size = 0
+		for _, chunk := range player.Chunks {
+			// reduce chunk size
+			chunk.SizeTimer += delta
+			reduceCount := 0.5 + 200.0/float64(chunk.Size)
+			if chunk.SizeTimer > reduceCount {
+				chunk.SizeTimer = 0
+				if chunk.Size > 10 {
+					chunk.Size--
+					chunk.Radius = sizeToRadius(chunk.Size)
+				}
+			}
+
+			// move chunk
+			distToMoveX := player.MoveTo.X - chunk.Position.X
+			distToMoveY := player.MoveTo.Y - chunk.Position.Y
+			dist2 := distToMoveX*distToMoveX + distToMoveY*distToMoveY
+			if dist2 > 0.001 {
+				dist := math.Sqrt(dist2)
+				if dist < player.Speed*delta {
+					chunk.Position.X = player.MoveTo.X
+					chunk.Position.Y = player.MoveTo.Y
+				} else {
+					chunk.Position.X += (distToMoveX / dist) * player.Speed * delta
+					chunk.Position.Y += (distToMoveY / dist) * player.Speed * delta
+				}
+			}
+			if math.Abs(chunk.ShiftTo.X) > 0.001 {
+				chunk.Position.X += chunk.ShiftTo.X * delta * player.Speed * 10
+				chunk.ShiftTo.X = chunk.ShiftTo.X - chunk.ShiftTo.X*delta*4
+			}
+			if math.Abs(chunk.ShiftTo.Y) > 0.001 {
+				chunk.Position.Y += chunk.ShiftTo.Y * delta * player.Speed * 10
+				chunk.ShiftTo.Y = chunk.ShiftTo.Y - chunk.ShiftTo.Y*delta*4
+			}
+
+			// eat other players
+			for _, playerCheck := range game.players {
+				if !playerCheck.Eaten && playerCheck != player {
+
+					i := 0
+					for i < len(playerCheck.Chunks) {
+						chunkCheck := playerCheck.Chunks[i]
+						eaten := false
+
+						if chunk.Size > uint16(float64(chunkCheck.Size)*1.1) {
+							distToX := chunkCheck.Position.X - chunk.Position.X
+							distToY := chunkCheck.Position.Y - chunk.Position.Y
+							dist2 := distToX*distToX + distToY*distToY
+							if dist2 < chunk.Radius*chunk.Radius {
+								eaten = true
+								chunk.Size += chunkCheck.Size
+								chunk.Radius = sizeToRadius(chunk.Size)
+								if len(playerCheck.Chunks) <= 1 {
+									playerCheck.Eaten = true
+									playerCheck.EatenTime = timeNow
+								} else {
+									last := len(playerCheck.Chunks) - 1
+									game.crumbs[i] = game.crumbs[last]
+									game.crumbs = game.crumbs[:last]
+								}
+							}
+						}
+
+						if eaten {
+							last := len(playerCheck.Chunks) - 1
+							playerCheck.Chunks[i] = playerCheck.Chunks[last]
+							playerCheck.Chunks = playerCheck.Chunks[:last]
+						} else {
+							i++
+						}
+					}
+				}
+			}
+
+			// calc player size
+			player.Size += chunk.Size
+		}
+
+		for _, player := range game.players {
+			centerX := 0.0
+			centerY := 0.0
+			for _, chunk := range player.Chunks {
+				centerX += chunk.Position.X
+				centerY += chunk.Position.Y
+			}
+			centerX /= float64(len(player.Chunks))
+			centerY /= float64(len(player.Chunks))
+			player.PlayerCenter.X = centerX
+			player.PlayerCenter.Y = centerY
 		}
 	}
 
@@ -205,17 +333,19 @@ func (game *Game) updateWorld(delta float64) {
 
 		for _, player := range game.players {
 			if !player.Eaten {
-				diffX := crumb.Position.X - player.Position.X
-				diffY := crumb.Position.Y - player.Position.Y
-				distSq := diffX*diffX + diffY*diffY
-				eatDist := math.Max(player.Radius, crumb.Radius)
+				for _, chunk := range player.Chunks {
+					diffX := crumb.Position.X - chunk.Position.X
+					diffY := crumb.Position.Y - chunk.Position.Y
+					distSq := diffX*diffX + diffY*diffY
+					eatDist := math.Max(chunk.Radius, crumb.Radius)
 
-				if distSq < eatDist*eatDist {
-					// Crumb eaten!
-					player.Size += uint16(crumb.Size)
-					player.Radius = sizeToRadius(player.Size)
-					eaten = true
-					break
+					if distSq < eatDist*eatDist {
+						// Crumb eaten!
+						chunk.Size += uint16(crumb.Size)
+						chunk.Radius = sizeToRadius(player.Size)
+						eaten = true
+						break
+					}
 				}
 			}
 		}

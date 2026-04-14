@@ -21,7 +21,10 @@ class GameWorld extends ChangeNotifier {
 
   Timer? _inputTimer;
 
+  DateTime lastClick = DateTime.now();
+
   Function(Offset target)? sendPlayerDirection;
+  Function(Offset target)? sendPlayerDivide;
 
   void provideFrame(ByteData data) {
     int entityCount = data.getUint16(2, Endian.big);
@@ -34,15 +37,16 @@ class GameWorld extends ChangeNotifier {
     playerIsEaten = data.getUint8(8) != 0;
 
     for (int el = 0; el < entityCount; el++) {
-      int offset = 12 + el * 16;
+      int offset = 12 + el * 20;
       final entityType = data.getUint8(offset + 0);
       final entityColorIndex = data.getUint8(offset + 1);
       final entitySize = data.getUint16(offset + 2, Endian.big);
       final entityID = data.getUint32(offset + 4, Endian.big);
+      final entityOwnerID = data.getUint32(offset + 8, Endian.big);
       final entityRelPosX =
-          data.getInt16(offset + 8, Endian.big).toDouble() / precision;
+          data.getInt16(offset + 12, Endian.big).toDouble() / precision;
       final entityRelPosY =
-          data.getInt16(offset + 10, Endian.big).toDouble() / precision;
+          data.getInt16(offset + 14, Endian.big).toDouble() / precision;
 
       final existing = entities[entityID.toString()];
       if (existing != null) {
@@ -53,6 +57,7 @@ class GameWorld extends ChangeNotifier {
       } else {
         final newEntity = GameWorldEntity(
           id: entityID,
+          ownerId: entityOwnerID,
           type: (entityType == 1)
               ? GameEntityType.player
               : GameEntityType.crumb,
@@ -64,7 +69,7 @@ class GameWorld extends ChangeNotifier {
         entities[entityID.toString()] = newEntity;
       }
 
-      if (entityID == playerId) {
+      if (entityOwnerID == playerId) {
         // this is our player
         targetZoom = 120.0 / (entitySize + 110) * 20.0;
       }
@@ -82,13 +87,21 @@ class GameWorld extends ChangeNotifier {
 
   void startDirectingPlayer(Offset screenPos) {
     directingPlayer = true;
-    playerDirection = _convertScreenToWorld(screenPos);
+    playerDirection = convertScreenToWorld(screenPos);
     sendPlayerDirection?.call(playerDirection);
     _startInputTimer();
+
+    // detect double click
+    DateTime newLastClickTime = DateTime.now();
+    Duration difference = newLastClickTime.difference(lastClick);
+    lastClick = newLastClickTime;
+    if (difference.inMilliseconds < 200) {
+      sendPlayerDivide?.call(playerDirection);
+    }
   }
 
   void updatePlayerDirection(Offset screenPos) {
-    playerDirection = _convertScreenToWorld(screenPos);
+    playerDirection = convertScreenToWorld(screenPos);
   }
 
   void stopDirectingPlayer() {
@@ -123,7 +136,7 @@ class GameWorld extends ChangeNotifier {
     _inputTimer = null;
   }
 
-  Offset _convertScreenToWorld(Offset screenPos) {
+  Offset convertScreenToWorld(Offset screenPos) {
     if (screenSize == null) return Offset.zero;
 
     final center = Offset(screenSize!.width / 2, screenSize!.height / 2);
