@@ -1,5 +1,9 @@
 # DSOgar.io
 
+## Live game on my VPS
+
+http://69.10.53.7:8080/
+
 ## Overview
 
 DSOgar.io is a real-time multiplayer game inspired by Agar.io and Ogario-style mechanics.  
@@ -123,13 +127,13 @@ MIT License – feel free to explore and learn from the code.
 - Binary protocol: implemented and in use
 - UI/UX improvements (player names, score display, HUD)
 - Game is playable end-to-end.
+- Complete day/night mode
+- Gameplay features like splitting and merging, etc.
 
 ---
 
 ## Next Steps
 
-- Complete day/night mode
 - General polish and quality-of-life improvements
-- Additional gameplay features (splitting, merging, etc.)
 - Performance tuning and optimization
 - Add sound effects and background music
