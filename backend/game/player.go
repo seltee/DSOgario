@@ -32,6 +32,7 @@ type Player struct {
 	Speed            float64
 	Eaten            bool
 	EatenTime        time.Time
+	DisconnectedTime time.Time
 	MarkedForRemoval bool
 }
 
@@ -75,6 +76,7 @@ func (player *Player) readPump(game *Game) {
 		if player.Conn != nil {
 			player.Conn.Close()
 			player.Conn = nil
+			player.DisconnectedTime = time.Now()
 		}
 	}()
 
@@ -125,6 +127,7 @@ func (player *Player) writePump() {
 				fmt.Println("Write error:", err, "player: ", player.Name)
 				player.Conn.Close()
 				player.Conn = nil
+				player.DisconnectedTime = time.Now()
 				return
 			}
 		}

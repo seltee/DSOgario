@@ -170,17 +170,26 @@ func (game *Game) updateWorld(delta float64) {
 	}
 
 	for key, player := range game.players {
+		// Mark to remove when eaten and not watching
 		if player.Eaten {
 			if player.Conn == nil {
 				player.MarkedForRemoval = true
+
 			}
 			if timeNow.Sub(player.EatenTime).Seconds() > 30 {
 				player.MarkedForRemoval = true
 			}
 		}
 
+		// Mark to remove when disconnected for too long
+		if player.Conn == nil {
+			if timeNow.Sub(player.DisconnectedTime).Seconds() > 180 {
+				player.MarkedForRemoval = true
+			}
+		}
+
+		// remove player and close connection
 		if player.MarkedForRemoval {
-			// remove player and close connection
 			if player.Conn != nil {
 				player.Conn.Close()
 				player.Conn = nil
