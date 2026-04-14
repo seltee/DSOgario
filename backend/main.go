@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"test/auth"
 	"test/game"
 	"test/handlers"
@@ -28,18 +29,10 @@ func main() {
 	handlers.RouteInit(router, tokenMgr, game)
 	auth.RouteInit(router, tokenMgr)
 
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`
-			<html>
-				<body>
-					<h1>Home Page</h1>
-					<p>Status: 200 OK</p>
-				</body>
-			</html>
-		`))
-	})
+	fs := http.FileServer(http.Dir("../frontend/build/web"))
+	router.Handle("/*", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	}))
 
 	// Custom 404 handler
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +47,12 @@ func main() {
 		`))
 	})
 
-	fmt.Println("Server is started")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("Started server, port :%s", port)
+
 	error := http.ListenAndServe(":8080", router)
 	if error != nil {
 		log.Fatal("Error running server ", error)

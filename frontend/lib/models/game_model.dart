@@ -1,6 +1,6 @@
 import 'dart:math';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:frontend/core/blob_colors.dart';
 import 'package:frontend/models/config.dart';
@@ -21,7 +21,7 @@ const inputMessageDivide = 2;
 enum GameState { loading, auth, game }
 
 class GameModel extends ChangeNotifier {
-  Network network = Network(baseUrl: baseUrl);
+  late final Network network = Network(baseUrl: _getBaseUrl());
   GameWorld gameWorld = GameWorld();
   ThemeModel themeModel = ThemeModel();
 
@@ -93,7 +93,7 @@ class GameModel extends ChangeNotifier {
 
     if (newToken != null) {
       token = newToken;
-      _webSocket = WebSocket(token: token, baseUrl: baseWSUrl);
+      _webSocket = WebSocket(token: token, baseUrl: _getBaseWSUrl());
 
       _webSocket?.onConnected = () {
         isLoggingIn = false;
@@ -204,6 +204,19 @@ class GameModel extends ChangeNotifier {
       bd.setInt16(4, directionY, Endian.big); // direction y
 
       _webSocket?.sendInput(inputBytes);
+    }
+  }
+
+  String _getBaseUrl() {
+    return kIsWeb ? Uri.base.origin : baseUrl;
+  }
+
+  String _getBaseWSUrl() {
+    if (kIsWeb) {
+      final uri = Uri.base;
+      return 'ws://${uri.host}:8080';
+    } else {
+      return baseWSUrl;
     }
   }
 }
